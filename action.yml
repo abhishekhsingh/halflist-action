@@ -30,7 +30,7 @@ inputs:
     required: false
     default: '3.12'
   junit:
-    description: 'Generate JUnit XML report (true/false)'
+    description: 'Generate JUnit XML report (true/false). Requires mcp-halflist >= 1.0.0.'
     required: false
     default: 'false'
   args-file:
@@ -108,17 +108,13 @@ runs:
           ARGS+=("--args-file" "$INPUT_ARGS_FILE")
         fi
 
-        NEED_JSON="false"
-        if [ "$INPUT_JUNIT" = "true" ] || [ "$INPUT_FAIL_ON_WARN" = "true" ]; then
-          NEED_JSON="true"
-        fi
-
         EXIT_CODE=0
+        SCORE=""
 
-        if [ "$NEED_JSON" = "true" ]; then
+        # fail-on-warn: run with JSON to parse warning count
+        if [ "$INPUT_FAIL_ON_WARN" = "true" ]; then
           JSON_FILE=$(mktemp /tmp/halflist-XXXXXX.json)
 
-          # Run with JSON output for structured parsing
           # $INPUT_ARGS is intentionally unquoted for word-splitting
           "${ARGS[@]}" --format json $INPUT_ARGS > "$JSON_FILE" || EXIT_CODE=$?
 
@@ -140,32 +136,37 @@ runs:
         ")
 
           echo "score=$SCORE" >> "$GITHUB_OUTPUT"
-
-          if [ "$INPUT_JUNIT" = "true" ]; then
-            JUNIT_PATH="halflist-results.xml"
-            halflist report "$JSON_FILE" --format junit -o "$JUNIT_PATH" || true
-            echo "report=$JUNIT_PATH" >> "$GITHUB_OUTPUT"
-          fi
-
           echo "::notice::halflist score: $SCORE/100"
+          rm -f "$JSON_FILE"
 
-          if [ "$INPUT_FAIL_ON_WARN" = "true" ] && [ "$WARNED" -gt 0 ] && [ "$EXIT_CODE" -eq 0 ]; then
+          if [ "$WARNED" -gt 0 ] && [ "$EXIT_CODE" -eq 0 ]; then
             echo "::warning::$WARNED warning(s) found and fail-on-warn is enabled"
             echo "result=fail" >> "$GITHUB_OUTPUT"
-            rm -f "$JSON_FILE"
             exit 1
           fi
+        fi
 
-          rm -f "$JSON_FILE"
-        else
-          # Terminal output for CI logs
+        # junit: run with --format junit, redirect stdout to file
+        if [ "$INPUT_JUNIT" = "true" ]; then
+          JUNIT_PATH="halflist-results.xml"
+          "${ARGS[@]}" --format junit $INPUT_ARGS > "$JUNIT_PATH" || EXIT_CODE=$?
+          echo "report=$JUNIT_PATH" >> "$GITHUB_OUTPUT"
+
+        # default: terminal output for CI logs
+        elif [ "$INPUT_FAIL_ON_WARN" != "true" ]; then
           "${ARGS[@]}" $INPUT_ARGS || EXIT_CODE=$?
         fi
 
         if [ "$EXIT_CODE" -eq 0 ]; then
           echo "result=pass" >> "$GITHUB_OUTPUT"
+          if [ -z "$SCORE" ]; then
+            echo "score=100" >> "$GITHUB_OUTPUT"
+          fi
         else
           echo "result=fail" >> "$GITHUB_OUTPUT"
+          if [ -z "$SCORE" ]; then
+            echo "score=0" >> "$GITHUB_OUTPUT"
+          fi
           exit "$EXIT_CODE"
         fi
 

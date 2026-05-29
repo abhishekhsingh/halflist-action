@@ -47,14 +47,21 @@ jobs:
           command: "python3 test_server.py"
           mode: check
 
-      - name: Run halflist action (audit with JUnit)
+      - name: Run halflist action (audit)
         uses: ./
         with:
           command: "python3 test_server.py"
           mode: audit
-          junit: 'true'
 
-      - name: Verify JUnit XML was created
-        run: |
-          test -f halflist-results.xml
-          python3 -c "import xml.etree.ElementTree as ET; ET.parse('halflist-results.xml'); print('Valid XML')"
+      # TODO: Enable junit tests once mcp-halflist with --format junit is on PyPI
+      # - name: Run halflist action (audit with JUnit)
+      #   uses: ./
+      #   with:
+      #     command: "python3 test_server.py"
+      #     mode: audit
+      #     junit: 'true'
+      #
+      # - name: Verify JUnit XML was created
+      #   run: |
+      #     test -f halflist-results.xml
+      #     python3 -c "import xml.etree.ElementTree as ET; ET.parse('halflist-results.xml'); print('Valid XML')"
