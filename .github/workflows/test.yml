@@ -1,0 +1,60 @@
+name: Test Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-stdio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test server deps
+        run: pip install mcp
+
+      - name: Create test server
+        run: |
+          cat > test_server.py << 'PYEOF'
+          from mcp.server.fastmcp import FastMCP
+
+          mcp = FastMCP("test-server")
+
+          @mcp.tool()
+          def greet(name: str) -> str:
+              """Greet someone by name."""
+              return f"Hello, {name}!"
+
+          @mcp.tool()
+          def add(a: int, b: int) -> int:
+              """Add two numbers."""
+              return a + b
+
+          if __name__ == "__main__":
+              mcp.run()
+          PYEOF
+
+      - name: Run halflist action (check)
+        uses: ./
+        with:
+          command: "python3 test_server.py"
+          mode: check
+
+      - name: Run halflist action (audit with JUnit)
+        uses: ./
+        with:
+          command: "python3 test_server.py"
+          mode: audit
+          junit: 'true'
+
+      - name: Verify JUnit XML was created
+        run: |
+          test -f halflist-results.xml
+          python3 -c "import xml.etree.ElementTree as ET; ET.parse('halflist-results.xml'); print('Valid XML')"
