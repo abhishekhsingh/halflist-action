@@ -18,7 +18,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install test server deps
-        run: pip install mcp
+        # The test server uses the FastMCP API from mcp 1.x. mcp 2.x renamed it
+        # and is not supported by mcp-halflist yet.
+        run: pip install "mcp<2"
 
       - name: Create test server
         run: |
@@ -64,3 +66,28 @@ jobs:
         run: |
           test -f halflist-results.xml
           python3 -c "import xml.etree.ElementTree as ET; ET.parse('halflist-results.xml'); print('Valid XML')"
+
+      - name: Create halflist.toml
+        run: |
+          cat > halflist.toml << 'TOMLEOF'
+          [server]
+          transport = "stdio"
+          command = "python3 test_server.py"
+          TOMLEOF
+
+      - name: Run halflist action (config file only, no command or url)
+        id: config-only
+        uses: ./
+        with:
+          config: halflist.toml
+
+      - name: Verify config-only run passed
+        run: test "${{ steps.config-only.outputs.result }}" = "pass"
+
+      - name: Run halflist action with no server configured (must fail)
+        id: no-server
+        uses: ./
+        continue-on-error: true
+
+      - name: Verify the missing-server run failed
+        run: test "${{ steps.no-server.outcome }}" = "failure"

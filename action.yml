@@ -38,7 +38,7 @@ inputs:
     required: false
     default: ''
   config:
-    description: 'Path to halflist.toml config file'
+    description: 'Path to halflist.toml config file. Can supply server.command or server.url, so command and url may be omitted.'
     required: false
     default: ''
   fail-on-warn:
@@ -48,7 +48,7 @@ inputs:
 
 outputs:
   score:
-    description: 'Server conformance score (0-100)'
+    description: 'Conformance score (0-100). Parsed from the report when fail-on-warn is true; otherwise 100 when the run passes and 0 when it fails.'
     value: ${{ steps.run.outputs.score }}
   result:
     description: 'pass or fail'
@@ -95,8 +95,10 @@ runs:
           ARGS+=("--stdio" "$INPUT_COMMAND")
         elif [ -n "$INPUT_URL" ]; then
           ARGS+=("--http" "$INPUT_URL")
-        else
-          echo "::error::Either 'command' (stdio) or 'url' (http) input is required"
+        elif [ -z "$INPUT_CONFIG" ]; then
+          # A config file may supply server.command or server.url, so it is
+          # also a valid way to select the server.
+          echo "::error::One of 'command' (stdio), 'url' (http) or 'config' (halflist.toml with a [server] section) is required"
           exit 1
         fi
 

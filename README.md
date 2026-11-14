@@ -66,14 +66,14 @@ jobs:
 | `config` | Path to halflist.toml config file | |
 | `fail-on-warn` | Fail the action if warnings are found | `false` |
 
-Either `command` or `url` is required.
+One of `command`, `url`, or a `config` file whose `[server]` section sets `command` or `url` is required.
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
 | `result` | `pass` or `fail` |
-| `score` | Conformance score (0-100, available when `junit` or `fail-on-warn` is enabled) |
+| `score` | Conformance score (0-100). Parsed from the report when `fail-on-warn` is `true`; otherwise `100` when the run passes and `0` when it fails |
 | `report` | Path to JUnit XML file (when `junit` is enabled) |
 
 ## Examples
@@ -121,7 +121,7 @@ Either `command` or `url` is required.
     config: "halflist.toml"
 ```
 
-When using a config file with `server.command` or `server.url`, the `command`/`url` inputs can be omitted if the config provides them. Pass `command` or `url` anyway to keep the workflow self-documenting.
+When the config file sets `server.command` or `server.url`, the `command` and `url` inputs can be omitted. If you do pass `command` or `url`, they override the config.
 
 ### Pin a specific version
 
@@ -152,6 +152,16 @@ When using a config file with `server.command` or `server.url`, the `command`/`u
 
 - run: echo "Score: ${{ steps.halflist.outputs.score }}"
 ```
+
+## Notes
+
+- **`args` is split on whitespace.** There is no shell quoting, so a value that contains spaces (for example `--header "Authorization: Bearer x"`) cannot be passed through `args`. Put headers and secrets in a `halflist.toml` (`[server]` section, `${ENV_VAR}` expansion is supported) and pass it with `config`.
+- **Do not pass `--format` in `args`.** The action sets the format itself for `junit` and `fail-on-warn`, and a later `--format` in `args` overrides it.
+- **HTTP servers without authentication:** halflist starts an OAuth PKCE flow for any HTTP server when no `Authorization` header is set. In CI, add `args: "--no-auth"` for servers that need no authentication, or supply the header through `config`.
+- **`fail-on-warn` does not print the per-check report.** It parses the JSON report instead, so the log shows only the score. Run the action without `fail-on-warn` to see the full output.
+- **`mode: bench` does not fail on its own.** halflist exits `0` for `bench` even when tool calls fail. Use `check` or `audit` to gate a build.
+- **Exit codes** are passed through from halflist: `1` for failed checks, `2` for a connection error, `3` for a configuration error.
+- **Use `junit: 'true'` once per job.** The artifact is always named `halflist-junit-results` and the file is always `halflist-results.xml`.
 
 ## License
 
