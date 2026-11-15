@@ -167,3 +167,7 @@ When the config file sets `server.command` or `server.url`, the `command` and `u
 ## License
 
 MIT
+
+## Author
+
+[Abhishekh Singh](https://abhishekhsingh.github.io/)
