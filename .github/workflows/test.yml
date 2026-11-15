@@ -8,7 +8,16 @@ on:
 
 jobs:
   test-stdio:
+    name: test-stdio (mcp ${{ matrix.major }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - major: "1"
+            spec: "mcp>=1.24,<2"
+          - major: "2"
+            spec: "mcp>=2.3,<3"
     steps:
       - uses: actions/checkout@v4
 
@@ -17,30 +26,36 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install test server deps
-        # The test server uses the FastMCP API from mcp 1.x. mcp 2.x renamed it
-        # and is not supported by mcp-halflist yet.
-        run: pip install "mcp<2"
+      - name: Install the test server's mcp SDK
+        run: pip install "${{ matrix.spec }}"
 
       - name: Create test server
         run: |
           cat > test_server.py << 'PYEOF'
-          from mcp.server.fastmcp import FastMCP
+          try:
+              from mcp.server.mcpserver import MCPServer
 
-          mcp = FastMCP("test-server")
+              server = MCPServer("test-server", version="1.0.0")
+          except ImportError:  # mcp 1.x
+              from mcp.server.fastmcp import FastMCP
 
-          @mcp.tool()
+              server = FastMCP("test-server")
+
+
+          @server.tool()
           def greet(name: str) -> str:
               """Greet someone by name."""
               return f"Hello, {name}!"
 
-          @mcp.tool()
+
+          @server.tool()
           def add(a: int, b: int) -> int:
               """Add two numbers."""
               return a + b
 
+
           if __name__ == "__main__":
-              mcp.run()
+              server.run()
           PYEOF
 
       - name: Run halflist action (check)
@@ -84,6 +99,16 @@ jobs:
       - name: Verify config-only run passed
         run: test "${{ steps.config-only.outputs.result }}" = "pass"
 
+      - name: Run halflist action with a pinned halflist version
+        id: pinned
+        uses: ./
+        with:
+          command: "python3 test_server.py"
+          version: "1.0.2"
+
+      - name: Verify the pinned run passed
+        run: test "${{ steps.pinned.outputs.result }}" = "pass"
+
       - name: Run halflist action with no server configured (must fail)
         id: no-server
         uses: ./
@@ -91,3 +116,27 @@ jobs:
 
       - name: Verify the missing-server run failed
         run: test "${{ steps.no-server.outcome }}" = "failure"
+
+      - name: Verify the action left the job's mcp SDK untouched
+        env:
+          EXPECTED_MAJOR: ${{ matrix.major }}
+        run: |
+          python3 - << 'PYEOF'
+          import importlib.metadata as m
+          import os
+
+          version = m.version("mcp")
+          print("mcp in the job environment:", version)
+          assert version.split(".")[0] == os.environ["EXPECTED_MAJOR"], version
+          PYEOF
+
+      - name: Verify the test server still starts after the action ran
+        run: |
+          python3 - << 'PYEOF'
+          import importlib.util
+
+          spec = importlib.util.spec_from_file_location("test_server", "test_server.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          print("test server imports fine:", module.server.name)
+          PYEOF

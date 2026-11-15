@@ -156,6 +156,7 @@ When the config file sets `server.command` or `server.url`, the `command` and `u
 ## Notes
 
 - **`args` is split on whitespace.** There is no shell quoting, so a value that contains spaces (for example `--header "Authorization: Bearer x"`) cannot be passed through `args`. Put headers and secrets in a `halflist.toml` (`[server]` section, `${ENV_VAR}` expansion is supported) and pass it with `config`.
+- **halflist runs in its own virtual environment.** The action never changes the Python packages used by your server, so servers built on any `mcp` SDK version work, and the `version` input can pin any halflist release. Your server command runs with the job's own Python. The `halflist` command is not added to the job's `PATH`; to run it in other steps, install it there with `pip install mcp-halflist`.
 - **Do not pass `--format` in `args`.** The action sets the format itself for `junit` and `fail-on-warn`, and a later `--format` in `args` overrides it.
 - **HTTP servers without authentication:** halflist starts an OAuth PKCE flow for any HTTP server when no `Authorization` header is set. In CI, add `args: "--no-auth"` for servers that need no authentication, or supply the header through `config`.
 - **`fail-on-warn` does not print the per-check report.** It parses the JSON report instead, so the log shows only the score. Run the action without `fail-on-warn` to see the full output.

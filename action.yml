@@ -70,11 +70,19 @@ runs:
       env:
         HALFLIST_VERSION: ${{ inputs.version }}
       run: |
+        # halflist goes into its own virtual environment so the job's Python and
+        # the packages used by the server under test (including the mcp SDK) are
+        # never changed. The venv is not added to PATH, so the server command
+        # still runs with the job's own Python.
+        VENV="$RUNNER_TEMP/halflist-venv"
+        python -m venv "$VENV"
+        if [ -d "$VENV/Scripts" ]; then BIN="$VENV/Scripts"; else BIN="$VENV/bin"; fi
         if [ -n "$HALFLIST_VERSION" ]; then
-          pip install "mcp-halflist==$HALFLIST_VERSION"
+          "$BIN/python" -m pip install "mcp-halflist==$HALFLIST_VERSION"
         else
-          pip install mcp-halflist
+          "$BIN/python" -m pip install mcp-halflist
         fi
+        echo "HALFLIST_BIN=$BIN/halflist" >> "$GITHUB_ENV"
 
     - name: Run halflist
       id: run
@@ -89,7 +97,7 @@ runs:
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_FAIL_ON_WARN: ${{ inputs.fail-on-warn }}
       run: |
-        ARGS=("halflist" "$INPUT_MODE")
+        ARGS=("$HALFLIST_BIN" "$INPUT_MODE")
 
         if [ -n "$INPUT_COMMAND" ]; then
           ARGS+=("--stdio" "$INPUT_COMMAND")
