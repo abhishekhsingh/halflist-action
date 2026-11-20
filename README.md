@@ -1,5 +1,7 @@
 # halflist-action
 
+![License](https://img.shields.io/github/license/abhishekhsingh/halflist-action) ![Release](https://img.shields.io/github/v/release/abhishekhsingh/halflist-action)
+
 GitHub Action for testing MCP servers in CI. Runs conformance checks, security scans, and latency benchmarks using [mcp-halflist](https://github.com/abhishekhsingh/mcp-halflist).
 
 Three lines to test your MCP server:
